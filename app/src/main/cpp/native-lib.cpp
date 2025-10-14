@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <cstdlib>
 #include <time.h>
+#include <ctime>
 
 #if defined(__clang__)
 #define NOINLINE __attribute__((noinline, optnone))
@@ -18,7 +19,7 @@
 #endif
 
 auto fekFLAG = "SCH25{UthinkSO?_=P}";
-const static int EPOCH_TIME = 1741935524;
+//const static int EPOCH_TIME = 1741935524;
 
 // START ANTI-DEBUGGER
 bool C_F() {
@@ -58,51 +59,67 @@ bool C_D() {
 }
 // END ANTI-DEBUGGER
 
+// ======================= Util & OP_x (Pendekatan A) =======================
+/*
+   load_epoch_runtime()  : bangun epoch dari tanggal UTC (tanpa menyimpan epoch literal)
+   OP_3  : bagi 2 dalam domain desimal (string) → hindari munculnya epoch/2 literal
+   OP_1  : reverse digit desimal (in-place, string)
+   OP_2  : /1000 (buang 3 digit terakhir, hasil u32)
+   GEN   : PIN = OP_2(OP_1(OP_3(to_string(load_epoch_runtime()))))
+*/
+
 // PIN runtime helpers
 static NOINLINE uint64_t load_epoch_runtime() {
-    // Ambil nilai EPOCH_TIME yang memang visible sebagai clue
-    volatile const int* p = &EPOCH_TIME;   // paksa runtime load
-    int v = *p;
-
-    // Tambahkan dependensi runtime yang dibatalkan (hasil tetap v)
-    // Tujuannya cuma memutus constant folding.
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    int noise = (int)ts.tv_nsec;   // nilai runtime
-    v = (v ^ noise) ^ noise;       // kembali ke v
-
-    asm volatile("" :: "r"(v) : "memory"); // barrier kecil
-    return (uint64_t)v;
+    // Bangun waktu UTC dari hint: 14 Mar 2025 06:58:44 UTC
+    // (tanpa menyimpan epoch sebagai angka)
+    struct tm tmv{};
+    tmv.tm_year = 120 + 5;   // 2025 - 1900 = 125
+    tmv.tm_mon  = 1 + 1;     // March = 2 (0-based)
+    tmv.tm_mday = 7 + 7;     // 14
+    tmv.tm_hour = 3 + 3;     // 6
+    tmv.tm_min  = 60 - 2;    // 58
+    tmv.tm_sec  = 45 - 1;    // 44
+    // Konversi ke epoch (UTC)
+    time_t t = timegm(&tmv);
+    // Barrier kecil agar compiler/decompiler tidak “mengakali”
+    asm volatile("" :: "r"(t) : "memory");
+    return (uint64_t)t;
 }
 
 // reverse desimal dari val
-uint64_t OP_1(uint64_t val) {
-    uint64_t r = 0;
-    while (val) {
-        r = r * 10 + (val % 10);
-        val /= 10;
+// OP_3: pembagian 2 berbasis string (desimal) → tidak memunculkan half sebagai konstanta
+static NOINLINE std::string OP_3(const std::string& s) {
+    std::string out; out.reserve(s.size());
+    int carry = 0;
+    for (char c : s) {
+        int d = (c - '0') + carry * 10;
+        out.push_back(char('0' + (d / 2)));
+        carry = d % 2;
     }
-    return r;
+    size_t p = out.find_first_not_of('0');
+    return (p == std::string::npos) ? std::string("0") : out.substr(p);
 }
 
-// bagi 1000
-uint32_t OP_2(uint64_t val) {
-    return static_cast<uint32_t>(val / 1000);
+// OP_1: reverse digit desimal (in-place, string)
+static NOINLINE void OP_1(std::string& s) {
+    size_t i = 0, j = s.size();
+    while (i < j) { std::swap(s[i++], s[--j]); }
 }
 
-// generate pin
-// (EPOCH_TIME/2) -> reverse -> /1000
+// OP_2: bagi 1000 → ambil bagian ribuan ke atas (hasil u32)
+static NOINLINE uint32_t OP_2(const std::string& s) {
+    if (s.size() <= 3) return 0;
+    std::string t = s.substr(0, s.size() - 3);
+    return static_cast<uint32_t>(std::stoul(t)); // muat untuk timestamp normal
+}
+
+// GEN: (EPOCH/2 via OP_3) → reverse → /1000
 static NOINLINE uint32_t GEN() {
-    using op1_t = uint64_t(*)(uint64_t);
-    using op2_t = uint32_t(*)(uint64_t);
-
-    volatile op1_t f1 = OP_1;  // indirect call cegah inlining/IPA
-    volatile op2_t f2 = OP_2;
-
-    uint64_t half = load_epoch_runtime() / 2ULL;
-    uint64_t rev  = ((op1_t)f1)(half);
-    uint32_t pin  = ((op2_t)f2)(rev);
-
+    uint64_t epoch = load_epoch_runtime();                 // runtime, bukan konstanta
+    std::string sepoch = std::to_string(epoch);
+    std::string shalf  = OP_3(sepoch);       // desimal-bagi-2 (tanpa literal half)
+    OP_1(shalf);                             // reverse digit
+    uint32_t pin = OP_2(shalf);              // /1000 -> u32
     asm volatile("" :: "r"(pin) : "memory");
     return pin;
 }
