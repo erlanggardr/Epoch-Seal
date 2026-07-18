@@ -44,7 +44,6 @@ class MainActivity : AppCompatActivity() {
 
         val result = checkPinNative(enteredPin.toInt())
 
-        // If the result is not "Try again", it's the flag (either real or fake from anti-debug).
         if (result != "Try again") {
             AlertDialog.Builder(this)
                 .setTitle("SUCCESS! 🎉")
