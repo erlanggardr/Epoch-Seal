@@ -39,4 +39,35 @@ This project is implemented as an Android application using **Kotlin** for the f
 2. **Hint 2:** Epoch timestamp is `1741935524`.
 3. **Hint 3:** Analyze the JNI library `native-lib` to reconstruct the PIN generation algorithm. Inputting the correct epoch time into the reconstructed logic yields the valid 6-digit PIN. Entering this PIN in the app decrypts the flag.
 
-*Note: The actual flag is encrypted in the JNI binary and is decrypted dynamically upon entering the correct PIN.*
+---
+
+## Bahasa Indonesia (Indonesian Version)
+
+### Deskripsi Tantangan
+> Maret 2025. Pada detik puncak gerhana bulan tiba, si Pisi panik, karena ia tak bisa hidup tanpa cahaya matahari. Ia mengunci aplikasinya tepat di momen puncak gerhana, lalu kabur melarikan diri entah kemana. Yang tersisa hanyalah sebuah aplikasi android yang terkunci.
+> Aplikasi itu terkunci oleh angka. Konon, angka ini berhubungan dengan waktu yang di tinggalkan si Pisi.
+
+* **Kategori:** Reverse Engineering
+* **Kesulitan:** Mudah / Sedang
+* **Target SHA-256:** `a8e74a3ad4f11012d59cb97027842d7ad9dece2fbd6dd66ee26271f92341f62b`
+
+### Detail Desain & Implementasi
+Proyek ini diimplementasikan sebagai aplikasi Android menggunakan **Kotlin** pada sisi frontend dan **C++ (JNI / Android NDK)** untuk logika verifikasi inti guna mencegah analisis balik yang sepele.
+
+#### Fitur Utama
+1. **Pembuatan PIN Dinamis**: PIN yang valid dihitung secara dinamis berdasarkan waktu Epoch saat proses kompilasi (14 Maret 2025, 06:58:44 UTC $\rightarrow$ `1741935524`).
+2. **Kriptografi Lanjut (RC4 & Key Stretching)**: Kunci dekripsi diturunkan dari PIN menggunakan hashing FNV-1a dan salt statik (`0x5F3977DE13C78A42`), lalu di-stretch sebanyak **300.000 putaran** `SplitMix64`.
+3. **Anti-Debugging & Proteksi Modifikasi**: Menggunakan deteksi ptrace/TracerPid dan penalti delay waktu eksekusi selama **69 detik** dengan mengembalikan *fake flag* jika terdeteksi adanya debugger.
+
+### Petunjuk CTF & Alur Solusi
+1. **Hint 1:** Puncak Gerhana Bulan Maret adalah 14 Maret 2025, 6:58:44.5 UTC.
+2. **Hint 2:** Waktu Epoch adalah `1741935524`.
+3. **Hint 3:** Rekonstruksi algoritma pembuatan PIN dari file library JNI `native-lib`.
+
+---
+
+## Flag
+The flag for this challenge is:
+```text
+SCH25{wah_kau_benar-benar_REVERSE_chall_ini!-0_o}
+```
